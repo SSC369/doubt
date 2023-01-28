@@ -226,30 +226,29 @@ let format = require("date-fns/format");
 var isValid = require("date-fns/isValid");
 let parseISO = require("date-fns/parseISO");
 
-let loggerDate = (request, response, next) => {
-  if (isValid(parseISO(request.query.date))) {
-    next();
-  } else {
+app.get("/agenda/", async (request, response) => {
+  let { date } = request.query;
+  if (date === undefined) {
     response.status(400);
     response.send("Invalid Due Date");
-  }
-};
-
-app.get("/agenda/", loggerDate, async (request, response) => {
-  let { date } = request.query;
-
-  let newDate = format(new Date(date), "yyyy-MM-dd");
-  let data2 = JSON.stringify(newDate);
-  let query = ` 
-    SELECT *
+  } else {
+    const isDateValid = isValid(new Date(date));
+    if (isDateValid) {
+      let newDate = format(new Date(date), "yyyy-MM-dd");
+      let query = ` 
+    SELECT id, todo, priority, status, category, due_date AS dueDate
     FROM todo 
     WHERE
-    due_date = '${data2}';`;
+    due_date = '${newDate}';`;
 
-  let dbResponse = await db.get(query);
-  response.send(dbResponse.map((item) => convertToCamelCase(item)));
+      let dbResponse = await db.all(query);
+      response.send(dbResponse);
+    } else {
+      response.status(400);
+      response.send("Invalid Due Date");
+    }
+  }
 });
-
 let loggerPost = (request, response, next) => {
   let requestBody = request.body;
   let statusValues = ["TO DO", "IN PROGRESS", "DONE"];
