@@ -249,53 +249,61 @@ app.get("/agenda/", async (request, response) => {
     }
   }
 });
-let loggerPost = (request, response, next) => {
-  let requestBody = request.body;
-  let statusValues = ["TO DO", "IN PROGRESS", "DONE"];
-  let priorityValues = ["HIGH", "MEDIUM", "LOW"];
-  let categoryValues = ["WORK", "HOME", "LEARNING"];
-
+const validationRequestBody = (request, response, next) => {
+  const resObject = request.body;
   if (
-    statusValues.includes(requestBody.status) &&
-    priorityValues.includes(requestBody.priority) &&
-    categoryValues.includes(requestBody.category) &&
-    isValid(parseISO(requestBody.dueDate))
+    (resObject.status === undefined ||
+      ["TO DO", "IN PROGRESS", "DONE"].includes(resObject.status)) === false
   ) {
-    next();
+    response.status(400);
+    response.send("Invalid Todo Status");
+  } else if (
+    (resObject.priority === undefined ||
+      ["HIGH", "MEDIUM", "LOW"].includes(resObject.priority)) === false
+  ) {
+    response.status(400);
+    response.send("Invalid Todo Priority");
+  } else if (
+    (resObject.category === undefined ||
+      ["WORK", "HOME", "LEARNING"].includes(resObject.category)) === false
+  ) {
+    response.status(400);
+    response.send("Invalid Todo Category");
+  } else if (
+    (resObject.dueDate === undefined ||
+      isValid(new Date(resObject.dueDate))) === false
+  ) {
+    response.status(400);
+    response.send("Invalid Due Date");
   } else {
-    if (!statusValues.includes(requestBody.status)) {
-      response.status(400);
-      response.send("Invalid Todo Status");
-    } else if (!priorityValues.includes(requestBody.priority)) {
-      response.status(400);
-      response.send("Invalid Todo Priority");
-    } else if (!categoryValues.includes(requestBody.category)) {
-      response.status(400);
-      response.send("Invalid Todo Category");
-    } else {
-      response.status(400);
-      response.send("Invalid Due Date");
-    }
+    next();
   }
 };
 
-app.post("/todos/", loggerPost, async (request, response) => {
+app.post("/todos/", validationRequestBody, async (request, response) => {
   let details = request.body;
   let { id, todo, priority, status, category, dueDate } = details;
-  let query = `
+  let checkTodo = `select * from todo where id = ${id};`;
+  let dbR = await db.all(checkTodo);
+  if (dbR.length > 0) {
+    response.send("TodoId Exist");
+  } else {
+    let date = format(new Date(dueDate), "yyyy-MM-dd");
+    let query =`
     INSERT INTO todo (id, todo, priority, status, category, due_date)
-    VALUES(
+    VALUES
+        (
         ${id},
         '${todo}',
         '${priority}',
         '${status}',
         '${category}',
-        '${dueDate}'
+        '${date}'
     );`;
 
-  let dbResponse = await db.run(query);
-  const todoId = dbResponse.lastID;
-  response.send("Todo Successfully Added");
+    let dbResponse = await db.run(query);
+    response.send("Todo Successfully Added");
+  }
 });
 
 const loggerPut = (request, response, next) => {
